@@ -37,11 +37,11 @@ if __name__ == "__main__":
         print(f"Error detecting OS: {e}")
 
     try:
-        # Get open ports and Nmap output
-        open_ports, nmap_output = getPorts.scan_ports(ip)
+        # Get open ports and filtered Nmap output (tabular format)
+        open_ports, output = getPorts.scan_ports(ip)
         print(f"Open Ports: {open_ports}")
-        print("\nNmap Output (Service Detection by Mahin):")
-        print(nmap_output)
+        print("\nService Detection:")
+        print(output)  # This prints the cleaned, formatted table of open ports and services
     except Exception as e:
         print(f"Error scanning ports: {e}")
 
@@ -50,5 +50,5 @@ if __name__ == "__main__":
         print(f"Device Type: {dtype}")
     except Exception as e:
         print(f"Error detecting device type: {e}")
-    
-    print("\nMade by Tarik & Mahin.")  # Add your name at the end for fun
+
+    print("\nMade by Md. Ashav Noman Mahin.")  # Fun note at the end
