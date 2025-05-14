@@ -2,36 +2,35 @@
     "devices": [
       {
         "device_type": "TV",
-        "ports": [8008, 1900]
+        "open_ports": [8008, 1900]
       },
       {
         "device_type": "Camera",
-        "ports": [554, 34567, 8000]
+        "open_ports": [554, 34567, 8000]
       },
       {
         "device_type": "Mobile",
-        "ports": [62078, 8888, 5228, 5222]
+        "open_ports": [62078, 8888, 5228, 5222]
       },
       {
         "device_type": "Smart Plug",
-        "ports": [433, 8883]
+        "open_ports": [433, 8883]
       },
       {
         "device_type": "Smart Thermostat",
-        "ports": [1883, 8883]
+        "open_ports": [1883, 8883]
       },
       {
         "device_type": "Smart Lights",
-        "ports": [443, 9999]
+        "open_ports": [443, 9999]
       },
       {
         "device_type": "Smart Security System",
-        "ports": [443, 554]
+        "open_ports": [443, 554]
       },
       {
         "device_type": "IoT Device",
-        "ports": [1883, 5683]
+        "open_ports": [1883, 5683]
       }
     ]
   }
-  
