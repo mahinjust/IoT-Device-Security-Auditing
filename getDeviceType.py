@@ -10,12 +10,12 @@ def load_device_data():
     return data
 
 # Function to check device type based on ports
-def guess_type(ports):
+def guess_type(open_ports):
     data = load_device_data()
 
     for device in data['devices']:
         # Check if any port in the device matches the given ports
-        if any(port in ports for port in device['ports']):
+        if any(port in open_ports for port in device['open_ports']):
             return device['device_type']
     
     return "Unknown"
@@ -33,8 +33,9 @@ if __name__ == "__main__":
     vendor = findVendor.get_vendor(mac)
     print(f"Vendor: {vendor}")
 
-    ports = getPorts.scan_ports(ip)
-    print(f"Open Ports: {ports}")
+    open_ports, formatted_ports_table = getPorts.scan_ports(ip)  # Get open ports and formatted table
+    print("Service Detection:")
+    print(formatted_ports_table)  # Display the nmap table of open ports
     
-    dtype = guess_type(ports)
+    dtype = guess_type(open_ports, vendor)  # Use the open ports for device type detection
     print(f"Device Type: {dtype}")
