@@ -1,36 +1,88 @@
 {
-    "devices": [
-      {
-        "device_type": "TV",
-        "open_ports": [8008, 1900]
-      },
-      {
-        "device_type": "Camera",
-        "open_ports": [554, 34567, 8000]
-      },
-      {
-        "device_type": "Mobile",
-        "open_ports": [62078, 8888, 5228, 5222]
-      },
-      {
-        "device_type": "Smart Plug",
-        "open_ports": [433, 8883]
-      },
-      {
-        "device_type": "Smart Thermostat",
-        "open_ports": [1883, 8883]
-      },
-      {
-        "device_type": "Smart Lights",
-        "open_ports": [443, 9999]
-      },
-      {
-        "device_type": "Smart Security System",
-        "open_ports": [443, 554]
-      },
-      {
-        "device_type": "IoT Device",
-        "open_ports": [1883, 5683]
-      }
-    ]
-  }
+  "devices": [
+    {
+      "device_type": "TV",
+      "ports": [8008, 1900, 7000, 5555]
+    },
+    {
+      "device_type": "Camera",
+      "ports": [554, 8000, 8081, 8082]
+    },
+    {
+      "device_type": "Mobile",
+      "ports": [5228, 5222, 443, 8080]
+    },
+    {
+      "device_type": "Smart Plug",
+      "ports": [8883, 8008, 8080]
+    },
+    {
+      "device_type": "Smart Thermostat",
+      "ports": [1883, 8883, 3000, 6000]
+    },
+    {
+      "device_type": "Smart Lights",
+      "ports": [5678, 8888, 10000, 6666]
+    },
+    {
+      "device_type": "Smart Security System",
+      "ports": [554, 443, 8080, 8081]
+    },
+    {
+      "device_type": "Access Point (Router)",
+      "ports": [67, 68, 69, 123, 53, 443, 8080]
+    },
+    {
+      "device_type": "Printer",
+      "ports": [9100, 515, 631, 443]
+    },
+    {
+      "device_type": "Smart Refrigerator",
+      "ports": [8883, 443, 5678, 6666]
+    },
+    {
+      "device_type": "Smart TV (Android)",
+      "ports": [5555, 8008, 8080, 8888]
+    },
+    {
+      "device_type": "Smart Coffee Maker",
+      "ports": [54321, 8883, 9000]
+    },
+    {
+      "device_type": "Smart Washing Machine",
+      "ports": [8080, 6000, 8883]
+    },
+    {
+      "device_type": "Smart Lock",
+      "ports": [54321, 8883, 3333]
+    },
+    {
+      "device_type": "Smart Mirror",
+      "ports": [4444, 5555, 6666]
+    },
+    {
+      "device_type": "Smart Smoke Detector",
+      "ports": [5678, 8883, 6000]
+    },
+    {
+      "device_type": "Smart Vacuum",
+      "ports": [8883, 6666, 3000]
+    },
+    {
+      "device_type": "Smart Light Bulb",
+      "ports": [5678, 8008, 9999]
+    },
+    {
+      "device_type": "Smart Air Purifier",
+      "ports": [8883, 5678, 8888]
+    },
+    {
+      "device_type": "Smart Scale",
+      "ports": [8883, 5555, 8008]
+    },
+    {
+      "device_type": "Smart Home Hub",
+      "ports": [1883, 8883, 3000, 1234]
+    }
+  ]
+}
