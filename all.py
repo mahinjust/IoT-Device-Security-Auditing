@@ -1,4 +1,5 @@
-import getDefaultGetway
+import os
+import allIP
 import findMacAddress
 import findVendor
 import getPorts
@@ -6,41 +7,36 @@ import getOS
 import getDeviceType
 
 if __name__ == "__main__":
-    ip = input("Enter IP address: ").strip()
-    print("Hold tight, this might take a while... Don’t worry, we're not hacking... yet!\n")
-
-    print(f"IP Address: {ip}")
+    # Get the gateway IP from the system
+    response = os.popen("ip route").readlines()
+    gateway_ip = ""
     
-    try:
+    # Find the correct gateway IP line and extract the gateway
+    for line in response:
+        if "default" in line:
+            gateway_ip = line.split()[2] + "/24"
+            break
+    
+    # Get the connected devices' IPs using the allIP scan_network method
+    ips = allIP.scan_network(gateway_ip)
+    
+    # Loop through each connected IP address and print their details
+    for ip in ips:
+        print(f"Scanning IP: {ip}")
+
+        # Fetching details for each IP address
         mac = findMacAddress.get_mac(ip).upper()
         print(f"MAC Address: {mac}")
-    except Exception as e:
-        print(f"Error finding MAC address: {e}")
 
-    try:
         vendor = findVendor.get_vendor(mac)
-        print(f"Vendor Name: {vendor}")
-    except Exception as e:
-        print(f"Error finding vendor information: {e}")
+        print(f"Vendor: {vendor}")
 
-    try:
         os = getOS.detect_os(ip)
         print(f"Operating System: {os}")
-    except Exception as e:
-        print(f"Error detecting OS: {e}")
 
-    try:
-        # Get open ports and filtered Nmap output (tabular format)
-        open_ports, output = getPorts.scan_ports(ip)
-        print("\nRunning Service Detection:")
-        print(output)  # This prints the cleaned, formatted table of open ports and services
-    except Exception as e:
-        print(f"Error scanning ports: {e}")
+        ports = getPorts.scan_ports(ip)
+        print(f"Open Ports: {ports}")
 
-    try:
-        dtype = getDeviceType.guess_type(open_ports)
+        dtype = getDeviceType.guess_type(vendor, ports)
         print(f"Device Type: {dtype}")
-    except Exception as e:
-        print(f"Error detecting device type: {e}")
-
-    print("\nMade by Md. Ashav Noman Mahin.") 
+        print("-" * 40)  # Separator between IPs for better readability
