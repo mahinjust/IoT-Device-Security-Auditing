@@ -1,6 +1,11 @@
 {
   "devices": [
     {
+      "device_type": "Access Point (Router)",
+      "ports": [53, 443],
+      "vendor": "TP-Link"
+    },
+    {
       "device_type": "TV",
       "ports": [8008, 1900, 7000, 5555]
     },
@@ -27,10 +32,6 @@
     {
       "device_type": "Smart Security System",
       "ports": [554, 443, 8080, 8081]
-    },
-    {
-      "device_type": "Access Point (Router)",
-      "ports": [67, 68, 69, 123, 53, 443, 8080]
     },
     {
       "device_type": "Printer",
