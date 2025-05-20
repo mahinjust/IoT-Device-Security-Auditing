@@ -9,16 +9,25 @@ def load_device_data():
         data = json.load(file)
     return data
 
-# Function to check device type based on ports
-def guess_type(open_ports):
+# Function to check device type based on ports and vendor
+def guess_type(vendor, ports):
     data = load_device_data()
-
-    for device in data['devices']:
-        # Check if any port in the device matches the given ports
-        if any(port in open_ports for port in device['open_ports']):
-            return device['device_type']
     
-    return "Unknown"
+    matching_device = None
+    match_counts = {}
+   
+    # Check based on multiple port matches (at least 2 or more ports should match)
+    for device in data['devices']:
+        # Track how many matching ports we have
+        match_count = sum(1 for port in device['ports'] if any(port == p['port'] for p in ports))
+
+        # If 2 or more ports match, consider it a match
+        if match_count >= 2:
+            matching_device = device
+            break
+
+    # If no match, default to "Unknown"
+    return matching_device['device_type'] if matching_device else "Unknown"
 
 if __name__ == "__main__":
     ip = input("Enter IP address: ").strip()
@@ -33,9 +42,8 @@ if __name__ == "__main__":
     vendor = findVendor.get_vendor(mac)
     print(f"Vendor: {vendor}")
 
-    open_ports, formatted_ports_table = getPorts.scan_ports(ip)  # Get open ports and formatted table
-    print("Service Detection:")
-    print(formatted_ports_table)  # Display the nmap table of open ports
+    ports = getPorts.scan_ports(ip)
+    print(f"Open Ports: {ports}")
     
-    dtype = guess_type(open_ports, vendor)  # Use the open ports for device type detection
+    dtype = guess_type(vendor, ports)
     print(f"Device Type: {dtype}")
