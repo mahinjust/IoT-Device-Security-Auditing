@@ -50,6 +50,7 @@ if __name__ == "__main__":
         formatted_ports = format_ports(ports)
         print(f"Port Information:\n{formatted_ports}")
 
+        # Update this line to use the new logic in getDeviceType
         dtype = getDeviceType.guess_type(vendor, ports)
         print(f"Device Type: {dtype}")
         print("-" * 40)  # Separator between IPs for better readability
