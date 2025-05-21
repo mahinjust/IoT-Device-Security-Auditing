@@ -4,7 +4,7 @@ import findMacAddress
 import findVendor
 import getPorts
 import getOS
-import getDeviceType
+import getDeviceType  # Import the getDeviceType module
 
 def format_ports(ports):
     # Create a formatted string for displaying table headers and port details
@@ -50,9 +50,10 @@ if __name__ == "__main__":
         formatted_ports = format_ports(ports)
         print(f"Port Information:\n{formatted_ports}")
 
-        # Update this line to use the new logic in getDeviceType
+        # Get the device type using the getDeviceType function
         dtype = getDeviceType.guess_type(vendor, ports)
         print(f"Device Type: {dtype}")
+        
         print("-" * 40)  # Separator between IPs for better readability
 
     # Ending statement
