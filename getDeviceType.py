@@ -14,7 +14,6 @@ def connect_to_database():
 
 # Function to get device type based on open ports (from the database)
 def get_device_type_from_db(open_ports):
-    # Connect to the database
     db_connection = connect_to_database()
     cursor = db_connection.cursor()
 
@@ -51,26 +50,6 @@ def get_device_type_from_db(open_ports):
 def guess_type(vendor, ports):
     # Get the device type and description based on open ports
     device_type, description = get_device_type_from_db(ports)
-    return device_type
-
-if __name__ == "__main__":
-    ip = input("Enter IP address: ").strip()
-    print("Start Scanning.....\n")
-
-    print(f"IP Address: {ip}")
-    mac = findMacAddress.get_mac(ip).upper()
-    print(f"MAC Address: {mac}")
     
-    if not mac:
-        print("Device Type: Unknown")
-
-    vendor = findVendor.get_vendor(mac)
-    print(f"Vendor: {vendor}")
-
-    # Get open ports by scanning the given IP address
-    ports = getPorts.scan_ports(ip)
-    print(f"Open Ports: {ports}")
-
-    # Call the guess_type function to get the device type based on the open ports
-    dtype = guess_type(vendor, ports)
-    print(f"Device Type: {dtype}")
+    # You could also add some more logic based on vendor or other characteristics if needed
+    return device_type
