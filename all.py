@@ -24,11 +24,22 @@ if __name__ == "__main__":
             gateway_ip = line.split()[2] + "/24"
             break
     
+    # Display the Gateway IP once
+    print(f"Gateway IP: {gateway_ip.split('/')[0]}\n")
+
     # Get the connected devices' IPs using the allIP scan_network method
     ips = allIP.scan_network(gateway_ip)
 
-    print("\n")
+    # Remove the gateway IP from the list of connected devices (to avoid scanning the gateway itself)
+    ips = [ip for ip in ips if ip != gateway_ip.split('/')[0]]
+
+    # Display only the connected devices (excluding the gateway)
+    print("Connected Devices:")
+    for ip in ips:
+        print(ip)
     
+    print("\nScanning Devices:\n")
+
     # Loop through each connected IP address and print their details
     for ip in ips:
         print(f"Scanning IP: {ip}")
