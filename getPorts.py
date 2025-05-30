@@ -1,27 +1,13 @@
 import socket
 
-# Custom service mapping for known IoT ports
-PORT_SERVICE_MAPPING = {
-    80: "http",
-    443: "https",
-    554: "rtsp",
-    8000: "http",
-    8008: "http",
-    8080: "http",
-    8081: "http",
-    8082: "http",
-    8883: "mqtt",
-    5228: "gcm",
-    5678: "http",
-    9100: "ipp",
-    515: "printer",
-    631: "ipp",
-    1883: "mqtt",
-    7000: "upnp",
-    1900: "upnp",
-    2020: "unknown_service",  # Added mapping for your unknown port
-    9999: "unknown_service"  # Added mapping for your unknown port
-}
+# Default service lookup from the system's /etc/services file
+def get_service(port):
+    try:
+        # First try to get the service name using socket.getservbyport
+        return socket.getservbyport(port, 'tcp')
+    except:
+        # If the service is not found, return 'Unknown Port'
+        return 'Unknown Port'
 
 def scan_ports(target_ip):
     port_info = []
@@ -41,17 +27,6 @@ def scan_ports(target_ip):
         except:
             pass
     return port_info
-
-def get_service(port):
-    # Check custom mapping first
-    if port in PORT_SERVICE_MAPPING:
-        return PORT_SERVICE_MAPPING[port]
-    
-    # Default socket lookup
-    try:
-        return socket.getservbyport(port, 'tcp')
-    except:
-        return 'Unknown Port'
 
 def scan_port_withServices(target_ip):
     print(f"Starting scan on {target_ip}...\n")
