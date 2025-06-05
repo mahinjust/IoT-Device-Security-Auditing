@@ -8,9 +8,12 @@ import findVendor
 import getPorts
 import getOS
 import getDeviceType
+import subprocess
+import platform
+import scapy.all as scapy
 
 def format_ports(ports):
-    # Create a formatted string for displaying table headers and port details
+    """Create a formatted string for displaying table headers and port details."""
     port_details = f"{'Port':<10} {'State':<10} {'Service'}\n"  # Adding table headers
     for port_info in ports:
         port_details += f"{port_info['port']:<10} {port_info['state']:<10} {port_info['service']}\n"
@@ -57,6 +60,57 @@ def get_interface_for_gateway(gateway_ip):
                     return ip, netmask, cidr
     return None, None, None
 
+def ping_ip(ip, count=3, timeout=2):
+    """Ping an IP address to check if it's reachable. Ping at least 'count' times."""
+    try:
+        response = subprocess.run(
+            ['ping', '-c', str(count), '-W', str(timeout), ip],  # Ping 'count' packets with timeout
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        if response.returncode == 0:  # If ping was successful
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Error pinging {ip}: {e}")
+        return False
+
+def arp_scan_network(ip_range):
+    """ARP scan to find all devices in a network range."""
+    devices = []
+    try:
+        # Use Scapy to send ARP request to the network
+        arp_request = scapy.ARP(pdst=ip_range)
+        broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
+        arp_request_broadcast = broadcast/arp_request
+        answered_list = scapy.srp(arp_request_broadcast, timeout=5, verbose=False)[0]
+        for element in answered_list:
+            devices.append(element[1].psrc)  # IP address of the device
+    except Exception as e:
+        print(f"Error performing ARP scan: {e}")
+    return devices
+
+def ipv6_scan_network(ip_range):
+    """IPv6 scan to find all devices in a network range."""
+    devices = []
+    try:
+        # Use Scapy to send ICMPv6 Echo Request to the network
+        icmpv6_request = scapy.ICMPv6EchoRequest()
+        ipv6_request = scapy.IPv6(dst=ip_range)/icmpv6_request
+        answered_list = scapy.srp6(ipv6_request, timeout=5, verbose=False)[0]
+        for element in answered_list:
+            devices.append(element[1].psrc)  # IPv6 address of the device
+    except Exception as e:
+        print(f"Error performing IPv6 scan: {e}")
+    return devices
+
+def save_connected_ips_to_file(ip_list):
+    """Save the list of reachable IPs to a file."""
+    with open("connected_ips.txt", "w") as file:
+        for ip in ip_list:
+            file.write(f"{ip}\n")
+
 if __name__ == "__main__":
     # 1. Get the gateway IP from the system
     gateway_ip = get_gateway_ip()
@@ -76,24 +130,29 @@ if __name__ == "__main__":
         exit(1)
     
     # 4. Build the network string for scanning
-    # If your scan_network expects "192.168.0.1/24" style, use interface IP with CIDR
     network = f"{ip}/{cidr}"
     
-    # 5. Get the connected devices' IPs using the allIP scan_network method
-    ips = allIP.scan_network(network)
+    # 5. Get all the devices' IPs using the ARP scan method (more reliable for detecting all devices)
+    all_devices_ips = arp_scan_network(f"{ip.split('.')[0]}.{ip.split('.')[1]}.{ip.split('.')[2]}.1/24")
+    # Optionally use IPv6 scanning
+    all_devices_ips.extend(ipv6_scan_network("fe80::/10"))
     
-    # Remove the gateway IP from the list of connected devices (to avoid scanning the gateway itself)
-    ips = [ip_addr for ip_addr in ips if ip_addr != gateway_ip]
-    
-    # Display only the connected devices (excluding the gateway)
+    # Display only the reachable connected devices (excluding the gateway)
     print("Connected Devices Ips:")
-    for ip_addr in ips:
-        print(ip_addr)
+    for ip_addr in all_devices_ips:
+        if ip_addr != gateway_ip:  # Avoid listing the gateway
+            print(ip_addr)
+    
+    # Save the connected devices' IPs to a file
+    save_connected_ips_to_file(all_devices_ips)
+    print("\nConnected devices IPs have been saved to 'connected_ips.txt'.\n")
     
     print("\nScanning Devices:\n")
     
-    # Loop through each connected IP address and print their details
-    for ip_addr in ips:
+    # Loop through each reachable IP address and print their details
+    for ip_addr in all_devices_ips:
+        if ip_addr == gateway_ip:  # Skip the gateway itself
+            continue
         print(f"Scanning IP: {ip_addr}")
 
         # Fetching details for each IP address
