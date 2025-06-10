@@ -11,6 +11,7 @@ import getDeviceType
 import subprocess
 import platform
 import scapy.all as scapy
+import concurrent.futures
 
 def format_ports(ports):
     """Create a formatted string for displaying table headers and port details."""
@@ -98,11 +99,24 @@ def ipv6_scan_network(ip_range):
         # Use Scapy to send ICMPv6 Echo Request to the network
         icmpv6_request = scapy.ICMPv6EchoRequest()
         ipv6_request = scapy.IPv6(dst=ip_range)/icmpv6_request
-        answered_list = scapy.srp6(ipv6_request, timeout=5, verbose=False)[0]
+        answered_list = scapy.srp(ipv6_request, timeout=1, verbose=False)[0]  # Reduced timeout
         for element in answered_list:
             devices.append(element[1].psrc)  # IPv6 address of the device
     except Exception as e:
         print(f"Error performing IPv6 scan: {e}")
+    return devices
+
+def ipv6_scan_network_parallel(ip_range):
+    """IPv6 scan using multiple threads to speed up the process."""
+    devices = []
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Divide the range into smaller chunks to scan in parallel
+            futures = [executor.submit(ipv6_scan_network, f"{ip_range}{i}") for i in range(0, 256)]
+            for future in concurrent.futures.as_completed(futures):
+                devices.extend(future.result())
+    except Exception as e:
+        print(f"Error performing parallel IPv6 scan: {e}")
     return devices
 
 def save_connected_ips_to_file(ip_list):
@@ -120,8 +134,8 @@ if __name__ == "__main__":
     
     # 2. Determine the class of the gateway IP
     ip_class = get_ip_class(gateway_ip)
-    print(f"Gateway IP: {gateway_ip}")
-    print(f"Class Breakdown: {ip_class}\n")
+    print(f"Default Gateway IP: {gateway_ip}")
+    print(f"Host Class Breakdown: {ip_class}\n")
     
     # 3. Get network details for the gateway interface
     ip, netmask, cidr = get_interface_for_gateway(gateway_ip)
@@ -134,11 +148,11 @@ if __name__ == "__main__":
     
     # 5. Get all the devices' IPs using the ARP scan method (more reliable for detecting all devices)
     all_devices_ips = arp_scan_network(f"{ip.split('.')[0]}.{ip.split('.')[1]}.{ip.split('.')[2]}.1/24")
-    # Optionally use IPv6 scanning
-    all_devices_ips.extend(ipv6_scan_network("fe80::/10"))
+    # Optionally use IPv6 scanning with parallelization
+    all_devices_ips.extend(ipv6_scan_network_parallel("fe80::"))
     
     # Display only the reachable connected devices (excluding the gateway)
-    print("Connected Devices Ips:")
+    print("Connected Devices Ips List:")
     for ip_addr in all_devices_ips:
         if ip_addr != gateway_ip:  # Avoid listing the gateway
             print(ip_addr)
@@ -147,36 +161,44 @@ if __name__ == "__main__":
     save_connected_ips_to_file(all_devices_ips)
     print("\nConnected devices IPs have been saved to 'connected_ips.txt'.\n")
     
-    print("\nScanning Devices:\n")
+    print("\nScanning Connected Devices One by One:\n")
     
     # Loop through each reachable IP address and print their details
-    for ip_addr in all_devices_ips:
-        if ip_addr == gateway_ip:  # Skip the gateway itself
-            continue
-        print(f"Scanning IP: {ip_addr}")
+for ip_addr in all_devices_ips:
+    if ip_addr == gateway_ip:  # Skip the gateway itself
+        continue
+    print(f"Scanning IP Address: {ip_addr}")
 
-        # Fetching details for each IP address
-        mac = findMacAddress.get_mac(ip_addr).upper()
-        print(f"MAC Address: {mac}")
+    # Fetching details for each IP address
+    mac = findMacAddress.get_mac(ip_addr).upper()
+    print(f"MAC Address: {mac}")
 
-        vendor = findVendor.get_vendor(mac)
-        print(f"Vendor: {vendor}")
+    vendor = findVendor.get_vendor(mac)
+    print(f"Vendor Name: {vendor}")
 
-        os_info = getOS.detect_os(ip_addr)
-        print(f"Operating System: {os_info}")
+    os_info = getOS.detect_os(ip_addr)
+    print(f"Operating System: {os_info}")
 
-        # Get the detailed port info (open ports, state, and services)
-        ports = getPorts.scan_ports(ip_addr)
-        
+    # Get the detailed port info (open ports, state, and services)
+    ports = getPorts.scan_ports(ip_addr)
+
+    # Check if no ports are open and show the appropriate message
+    if not ports:
+        print("Port Information: No open ports were found!")
+        dtype = "Unknown"  # Set device type to Unknown if no ports
+    else:
         # Format and print the ports with services and states
         formatted_ports = format_ports(ports)
         print(f"Port Information:\n{formatted_ports}")
 
         # Get the device type using the getDeviceType function
         dtype = getDeviceType.guess_type(vendor, ports)
-        print(f"Device Type: {dtype}")
-        
-        print("-" * 40)  # Separator between IPs for better readability
+        if not dtype:  # If no device type could be guessed, set it to Unknown
+            dtype = "Unknown"
+    
+    print(f"Device Type: {dtype}")
+    
+    print("-" * 40)  # Separator between IPs for better readability
 
-    # Ending statement
-    print("\nMade by Md. Ashav Noman Mahin.")
+# Ending statement
+print("\nMade by Md. Ashav Noman Mahin.")
