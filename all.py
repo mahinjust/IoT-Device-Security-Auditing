@@ -2,16 +2,14 @@ import os
 import socket
 import struct
 import netifaces
-import allIP
 import findMacAddress
 import findVendor
 import getPorts
 import getOS
 import getDeviceType
 import subprocess
-import platform
 import scapy.all as scapy
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
 def format_ports(ports):
     """Create a formatted string for displaying table headers and port details."""
@@ -29,7 +27,7 @@ def get_gateway_ip():
     return None
 
 def get_ip_class(ip):
-    """Determine the class of an IP address (A, B, or C)."""
+    """Determine the class of an IP address (A, B, C, D, E)."""
     first_octet = int(ip.split('.')[0])  # Get the first octet
     if 0 <= first_octet <= 127:
         return "Class A"
@@ -37,6 +35,10 @@ def get_ip_class(ip):
         return "Class B"
     elif 192 <= first_octet <= 223:
         return "Class C"
+    elif 224 <= first_octet <= 239:
+        return "Class D (Multicast)"
+    elif 240 <= first_octet <= 255:
+        return "Class E (Reserved)"
     else:
         return "Unknown"
 
@@ -61,8 +63,8 @@ def get_interface_for_gateway(gateway_ip):
                     return ip, netmask, cidr
     return None, None, None
 
-def ping_ip(ip, count=3, timeout=2):
-    """Ping an IP address to check if it's reachable. Ping at least 'count' times."""
+def ping_ip(ip, count=3, timeout=1):  # Reduced timeout for faster response
+    """Ping an IP address to check if it's reachable."""
     try:
         response = subprocess.run(
             ['ping', '-c', str(count), '-W', str(timeout), ip],  # Ping 'count' packets with timeout
@@ -92,38 +94,41 @@ def arp_scan_network(ip_range):
         print(f"Error performing ARP scan: {e}")
     return devices
 
-def ipv6_scan_network(ip_range):
-    """IPv6 scan to find all devices in a network range."""
-    devices = []
+def icmp_ping_scan_parallel(network_range):
+    """Ping all devices in a network range using ICMP in parallel."""
+    reachable_ips = []
+    
+    # Function to be used in parallel for checking reachability
+    def ping_device(ip):
+        is_reachable = ping_ip(ip)  # Check if the device is reachable using ping
+        return ip, is_reachable  # Return both IP and reachability
+    
     try:
-        # Use Scapy to send ICMPv6 Echo Request to the network
-        icmpv6_request = scapy.ICMPv6EchoRequest()
-        ipv6_request = scapy.IPv6(dst=ip_range)/icmpv6_request
-        answered_list = scapy.srp(ipv6_request, timeout=1, verbose=False)[0]  # Reduced timeout
-        for element in answered_list:
-            devices.append(element[1].psrc)  # IPv6 address of the device
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            futures = [executor.submit(ping_device, ip) for ip in network_range]  # Submit all tasks
+            for future in futures:
+                ip, is_reachable = future.result()  # Unpack the result (ip and reachability)
+                if is_reachable:
+                    reachable_ips.append(ip)
     except Exception as e:
-        print(f"Error performing IPv6 scan: {e}")
-    return devices
-
-def ipv6_scan_network_parallel(ip_range):
-    """IPv6 scan using multiple threads to speed up the process."""
-    devices = []
-    try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            # Divide the range into smaller chunks to scan in parallel
-            futures = [executor.submit(ipv6_scan_network, f"{ip_range}{i}") for i in range(0, 256)]
-            for future in concurrent.futures.as_completed(futures):
-                devices.extend(future.result())
-    except Exception as e:
-        print(f"Error performing parallel IPv6 scan: {e}")
-    return devices
+        print(f"Error during parallel ICMP scan: {e}")
+    
+    return reachable_ips
 
 def save_connected_ips_to_file(ip_list):
     """Save the list of reachable IPs to a file."""
     with open("connected_ips.txt", "w") as file:
         for ip in ip_list:
             file.write(f"{ip}\n")
+
+def get_network_range(ip, cidr):
+    """Generate a range of IPs based on the given network and CIDR."""
+    network = ip.split(".")
+    network_base = f"{network[0]}.{network[1]}.{network[2]}."
+    range_start = 1
+    range_end = 254  # For most home networks
+
+    return [f"{network_base}{i}" for i in range(range_start, range_end + 1)]
 
 if __name__ == "__main__":
     # 1. Get the gateway IP from the system
@@ -144,12 +149,16 @@ if __name__ == "__main__":
         exit(1)
     
     # 4. Build the network string for scanning
-    network = f"{ip}/{cidr}"
+    network_range = get_network_range(ip, cidr)
     
     # 5. Get all the devices' IPs using the ARP scan method (more reliable for detecting all devices)
     all_devices_ips = arp_scan_network(f"{ip.split('.')[0]}.{ip.split('.')[1]}.{ip.split('.')[2]}.1/24")
-    # Optionally use IPv6 scanning with parallelization
-    all_devices_ips.extend(ipv6_scan_network_parallel("fe80::"))
+    
+    # Use ICMP ping scan to ensure we catch devices not responding to ARP
+    all_devices_ips.extend(icmp_ping_scan_parallel(network_range))
+    
+    # Remove duplicates from the list of IPs
+    all_devices_ips = list(set(all_devices_ips))
     
     # Display only the reachable connected devices (excluding the gateway)
     print("Connected Devices Ips List:")
@@ -164,41 +173,41 @@ if __name__ == "__main__":
     print("\nScanning Connected Devices One by One:\n")
     
     # Loop through each reachable IP address and print their details
-for ip_addr in all_devices_ips:
-    if ip_addr == gateway_ip:  # Skip the gateway itself
-        continue
-    print(f"Scanning IP Address: {ip_addr}")
+    for ip_addr in all_devices_ips:
+        if ip_addr == gateway_ip:  # Skip the gateway itself
+            continue
+        print(f"Scanning IP Address: {ip_addr}")
 
-    # Fetching details for each IP address
-    mac = findMacAddress.get_mac(ip_addr).upper()
-    print(f"MAC Address: {mac}")
+        # Fetching details for each IP address
+        mac = findMacAddress.get_mac(ip_addr).upper()
+        print(f"MAC Address: {mac}")
 
-    vendor = findVendor.get_vendor(mac)
-    print(f"Vendor Name: {vendor}")
+        vendor = findVendor.get_vendor(mac)
+        print(f"Vendor Name: {vendor}")
 
-    os_info = getOS.detect_os(ip_addr)
-    print(f"Operating System: {os_info}")
+        os_info = getOS.detect_os(ip_addr)
+        print(f"Operating System: {os_info}")
 
-    # Get the detailed port info (open ports, state, and services)
-    ports = getPorts.scan_ports(ip_addr)
+        # Get the detailed port info (open ports, state, and services)
+        ports = getPorts.scan_ports(ip_addr)
 
-    # Check if no ports are open and show the appropriate message
-    if not ports:
-        print("Port Information: No open ports were found!")
-        dtype = "Unknown"  # Set device type to Unknown if no ports
-    else:
-        # Format and print the ports with services and states
-        formatted_ports = format_ports(ports)
-        print(f"Port Information:\n{formatted_ports}")
+        # Check if no ports are open and show the appropriate message
+        if not ports:
+            print("Port Information: No open ports were found!")
+            dtype = "Unknown"  # Set device type to Unknown if no ports
+        else:
+            # Format and print the ports with services and states
+            formatted_ports = format_ports(ports)
+            print(f"Port Information:\n{formatted_ports}")
 
-        # Get the device type using the getDeviceType function
-        dtype = getDeviceType.guess_type(vendor, ports)
-        if not dtype:  # If no device type could be guessed, set it to Unknown
-            dtype = "Unknown"
-    
-    print(f"Device Type: {dtype}")
-    
-    print("-" * 40)  # Separator between IPs for better readability
+            # Get the device type using the getDeviceType function
+            dtype = getDeviceType.guess_type(vendor, ports)
+            if not dtype:  # If no device type could be guessed, set it to Unknown
+                dtype = "Unknown"
+        
+        print(f"Device Type: {dtype}")
+        
+        print("-" * 40)  # Separator between IPs for better readability
 
 # Ending statement
 print("\nMade by Md. Ashav Noman Mahin.")
