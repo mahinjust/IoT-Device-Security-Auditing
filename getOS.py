@@ -1,5 +1,7 @@
 import subprocess
 import re
+import requests
+import socket
 
 def run(cmd):
     try:
@@ -7,17 +9,35 @@ def run(cmd):
     except Exception as e:
         return f"Error running command: {e}"
 
+def clean_os_string(raw):
+    """Extract and normalize OS name + version."""
+    patterns = [
+        r'Windows \d+(?: \w+)?',        # Windows 10, Windows 11 Pro
+        r'Linux \d+\.\d+',             # Linux 2.6
+        r'Linux',                      # Generic Linux
+        r'Mac OS X \d+\.\d+',          # Mac OS X 10.15
+        r'FreeBSD \d+\.\d+',
+        r'Solaris',
+        r'Unix',
+        r'Android \d+',
+        r'iOS \d+',
+    ]
+
+    for pat in patterns:
+        match = re.search(pat, raw, re.IGNORECASE)
+        if match:
+            return match.group(0).strip()
+
+    # Fallback to trimmed raw string
+    return raw.split(",")[0].strip()
+
 def nmap_os(ip):
     """Use Nmap for OS detection."""
     out = run(f"sudo nmap -O {ip}")
-    m = re.search(r"(OS details:.*|Running:.*)", out)
-    if m:
-        os_info = m.group(0)
-        # Extract OS version details if present
-        os_match = re.search(r"Running: (.+)", os_info)
-        if os_match:
-            return os_match.group(1)
-        return os_info
+    if out:
+        for line in out.splitlines():
+            if "OS details" in line or "Running" in line:
+                return clean_os_string(line)
     return None
 
 def xprobe2_os(ip):
@@ -25,7 +45,7 @@ def xprobe2_os(ip):
     out = run(f"xprobe2 {ip}")
     m = re.search(r"Operating system: (.+)", out)
     if m:
-        return f"xprobe2: {m.group(1)}"
+        return clean_os_string(m.group(1))
     return None
 
 def ttl_os_guess(ip):
@@ -42,13 +62,48 @@ def ttl_os_guess(ip):
             return "Unknown OS (based on TTL)"
     return None
 
+def p0f_os(ip):
+    """Use p0f for passive OS detection."""
+    out = run(f"p0f -i eth0 -s {ip}")
+    match = re.search(r"OS:\s*(.+)", out)
+    if match:
+        return clean_os_string(match.group(1))
+    return None
+
+def http_header_os(ip):
+    """Attempt to detect OS using HTTP headers."""
+    try:
+        url = f"http://{ip}"
+        headers = requests.get(url, timeout=5).headers
+        # Look for known OS signatures in headers
+        for header in headers:
+            if "Server" in header:
+                return clean_os_string(headers["Server"])
+    except requests.exceptions.RequestException:
+        return None
+
+def banner_grabbing(ip, port=80):
+    """Try to grab banners from a service to detect OS details."""
+    try:
+        sock = socket.socket()
+        sock.settimeout(3)  # Set a timeout for the connection
+        sock.connect((ip, port))  # Connect to the IP and port
+        sock.send(b"HEAD / HTTP/1.0\r\n\r\n")  # Send a simple HTTP HEAD request
+        banner = sock.recv(1024).decode('utf-8', errors='ignore')  # Receive the banner
+        return clean_os_string(banner)  # Clean and return the banner information
+    except Exception as e:
+        return None
+
 def detect_os(ip):
     """Detect OS using multiple methods, prioritizing more accurate ones."""
     results = []
     checks = [
         nmap_os,        # First, try Nmap OS detection
         xprobe2_os,     # Then try xprobe2 for OS detection
+        p0f_os,         # p0f for passive OS detection
+        http_header_os, # HTTP header-based OS detection
         ttl_os_guess,   # Finally, try TTL-based guess
+        lambda ip: banner_grabbing(ip, 80)  # Try banner grabbing on HTTP (port 80)
     ]
     
     for check in checks:
