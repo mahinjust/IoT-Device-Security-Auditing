@@ -11,13 +11,6 @@ import subprocess
 import scapy.all as scapy
 from concurrent.futures import ThreadPoolExecutor
 
-def format_ports(ports):
-    """Create a formatted string for displaying table headers and port details."""
-    port_details = f"{'Port':<10} {'State':<10} {'Service'}\n"  # Adding table headers
-    for port_info in ports:
-        port_details += f"{port_info['port']:<10} {port_info['state']:<10} {port_info['service']}\n"
-    return port_details
-
 def get_gateway_ip():
     """Get the default gateway IP from the routing table."""
     response = os.popen("ip route").readlines()
@@ -129,6 +122,13 @@ def get_network_range(ip, cidr):
     range_end = 254  # For most home networks
 
     return [f"{network_base}{i}" for i in range(range_start, range_end + 1)]
+
+def format_ports(ports):
+    """Create a formatted string for displaying table headers and port details."""
+    port_details = f"{'Port':<10} {'State':<10} {'Service'}\n"  # Adding table headers
+    for port_info in ports:
+        port_details += f"{port_info['port']:<10} {port_info['state']:<10} {port_info['service']}\n"
+    return port_details
 
 if __name__ == "__main__":
     # 1. Get the gateway IP from the system
