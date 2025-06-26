@@ -1,22 +1,30 @@
-import subprocess # Importing subprocess to run shell commands from Python.
-
-def run(cmd): # Define a function to run shell commands safely.
+import subprocess
+# Utility function to run a shell command and safely get its output.
+def run(cmd):
     try:
-        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL).decode().strip()  # Run the shell command, suppress errors, decode output from bytes to string, remove whitespace.
+        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL).decode().strip()
     except:
-        return ""  # If the command fails or throws an error, return an empty string.
+        return "" # Return empty string if the command fails
 
-def detect_firewall(ip): # Uses an ACK scan (-sA) against ports 1‑1000 to guess whether a host is protected by a stateful firewall. Returns 'Active', 'Not active', or 'Unknown'.
-    result = run(f"timeout 6 sudo nmap -sA -p 1-1000 {ip}")  # Run nmap with a 6‑second cap; needs sudo for raw packets
+def detect_firewall(ip):
+    """
+    Detects a firewall using ICMP error behavior.
+    Logic:
+    - If no ICMP port unreachable → likely a firewall.
+    - If ICMP unreachable, → no firewall.
+    """
+    # Use UDP scan to provoke ICMP errors (port unreachable)
+    result = run(f"timeout 8 sudo nmap -sU -p 33434 {ip}")  # 33434 often unused, triggers ICMP error
+    result = result.lower()
 
-    if "filtered" in result.lower():
-        return "Active"
-    elif "unfiltered" in result.lower():
-        return "Not active"
+    if "open|filtered" in result:
+        return "Active"  # Likely being silently filtered by firewall
+    elif "port unreachable" in result or "closed" in result:
+        return "Not active"  # ICMP error = no firewall
     else:
-        return "Unknown"   # Heuristic: filtered ⇒ firewall; unfiltered ⇒ likely none.
+        return "Unknown"
 
-# Test block (only runs if executed directly)
+# Test block
 if __name__ == "__main__":
     ip = input("Enter IP: ").strip()
     print(detect_firewall(ip))
