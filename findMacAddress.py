@@ -11,7 +11,7 @@ def get_mac(ip):
         answered_list = scapy.srp(broadcast / arp_request, timeout=1, verbose=False)[0] #  Send ARP and receive responses. scapy.srp() = "Send and Receive Packets at Layer 2" (Ethernet level).
 
         if answered_list: # If response received.
-            mac = answered_list[0][1].hwsrc # Extract MAC address. hwsrc stands for Hardware Source Address. It's the MAC address of the device that replied to the ARP request.
+            mac = answered_list[0][1].hwsrc # Extract MAC address. hwsrc stands for Hardware Source Address. It's the MAC address of the device that replied to ARP request.
 
             # Convert the first octet to binary and check the second least significant bit (LAA flag)
             first_octet = int(mac.split(":")[0], 16)
