@@ -1,30 +1,43 @@
 import subprocess
-# Utility function to run a shell command and safely get its output.
+
 def run(cmd):
     try:
         return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL).decode().strip()
     except:
-        return "" # Return empty string if the command fails
+        return ""
 
 def detect_firewall(ip):
     """
-    Detects a firewall using ICMP error behavior.
-    Logic:
-    - If no ICMP port unreachable → likely a firewall.
-    - If ICMP unreachable, → no firewall.
+    Hybrid firewall detection using:
+    - ICMP error behavior via UDP scan
+    - TCP ACK scan (detects stateful firewalls)
+    
+    Returns:
+        - 'Active' if any filtering is detected
+        - 'Not active' if all checks pass
+        - 'Unknown' if inconclusive
+        - 'Unreachable or silent host' if no response at all
     """
-    # Use UDP scan to provoke ICMP errors (port unreachable)
-    result = run(f"timeout 8 sudo nmap -sU -p 33434 {ip}")  # 33434 often unused, triggers ICMP error
-    result = result.lower()
 
-    if "open|filtered" in result:
-        return "Active"  # Likely being silently filtered by firewall
-    elif "port unreachable" in result or "closed" in result:
-        return "Not active"  # ICMP error = no firewall
+    # ---------- 1. ICMP-based detection ----------
+    icmp_result = run(f"timeout 8 sudo nmap -sU -p 33434 {ip}").lower()
+
+    # ---------- 2. TCP ACK scan ----------
+    ack_result = run(f"timeout 8 sudo nmap -sA -p 80 {ip}").lower()
+
+    # ---------- Additional check: Host is silent or unreachable ----------
+    if not icmp_result and not ack_result:
+        return "Unreachable or silent host (could be offline or behind a stealth firewall)"
+
+    # ---------- Heuristic decision ----------
+    if ("open|filtered" in icmp_result) or ("filtered" in ack_result):
+        return "Active"
+    elif ("port unreachable" in icmp_result or "closed" in icmp_result) and ("unfiltered" in ack_result):
+        return "Not active"
     else:
         return "Unknown"
 
-# Test block
+# Test
 if __name__ == "__main__":
     ip = input("Enter IP: ").strip()
     print(detect_firewall(ip))
