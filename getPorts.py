@@ -1,63 +1,78 @@
-import socket
-import concurrent.futures
-import time
+# Importing necessary modules
+import socket # For low-level networking (TCP/UDP socket operations)
+import concurrent.futures # For parallel (multithreaded) port scanning
+import json # For loading IANA service-port mappings
 
-# Default service lookup from the system's /etc/services file
-def get_service(port):
+# Load the IANA services JSON file into a Python dictionary
+with open("iana_services.json") as f:
+    IANA_SERVICES = json.load(f)  # Format: {"80/tcp": "http", "53/udp": "dns", ...}
+
+# Function to get the service name from IANA list based on port and protocol
+def get_service(port, protocol):
+    key = f"{port}/{protocol}" # Example: "80/tcp"
+    return IANA_SERVICES.get(key, "Unknown") # Return matched service or "Unknown" if not found
+
+# Scan a TCP port on a given IP
+def scan_tcp_port(ip, port):
     try:
-        # First try to get the service name using socket.getservbyport
-        return socket.getservbyport(port, 'tcp')
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:  # Create a TCP socket
+            sock.settimeout(0.5) # Set timeout to 0.5 seconds to avoid hanging
+            result = sock.connect_ex((ip, port))  # Try to connect to IP:port; returns 0 if successful
+            if result == 0: # Port is open
+                return {
+                    "port": port,
+                    "state": "open",
+                    "protocol": "tcp",
+                    "service": get_service(port, "tcp")  # Match service name from IANA list
+                }
     except:
-        # If the service is not found, return 'Unknown Port'
-        return 'Unknown Port'
+        return None  # On exception, skip this port
 
-# Scan a single port for a given target IP
-def scan_port(target_ip, port):
+# Scan a UDP port on a given IP
+def scan_udp_port(ip, port):
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)  # Increase timeout to handle slow responses
-        result = sock.connect_ex((target_ip, port))  # Return 0 if connection is successful
-        if result == 0:
-            service = get_service(port)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock: # Create a UDP socket
+            sock.settimeout(0.5)
+            sock.sendto(b"", (ip, port)) # Send empty packet
+            sock.recvfrom(1024)  # Try to receive response (not always reliable)
             return {
-                'port': port,
-                'state': 'open',
-                'service': service
+                "port": port,
+                "state": "open",
+                "protocol": "udp",
+                "service": get_service(port, "udp") # Match service name
             }
-        sock.close()
-    except (socket.error, TimeoutError):
-        return None
+    except:
+        return None  # Treat as closed or filtered if no response or error
 
-# Scan multiple ports concurrently using ThreadPoolExecutor
-def scan_ports(target_ip, port_range=(1, 10000)):
-    port_info = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:  # Using up to 100 threads
-        futures = []
-        for port in range(port_range[0], port_range[1]):  # Scan the range of ports
-            futures.append(executor.submit(scan_port, target_ip, port))
-        
-        for future in concurrent.futures.as_completed(futures):
+# Function to scan both TCP and UDP ports within a specified range on a given IP
+def scan_ports(ip, port_range=(1, 1000)):
+    open_ports = [] # List to collect results
+    # Use ThreadPoolExecutor to scan multiple ports concurrently for faster performance
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+        # Submit TCP scan jobs
+        tcp_futures = [executor.submit(scan_tcp_port, ip, port) for port in range(port_range[0], port_range[1]+1)]
+        # Submit UDP scan jobs
+        udp_futures = [executor.submit(scan_udp_port, ip, port) for port in range(port_range[0], port_range[1]+1)]
+    # Process results as soon as each future completes
+        for future in concurrent.futures.as_completed(tcp_futures + udp_futures):
             result = future.result()
-            if result:
-                port_info.append(result)
+            if result: # If port is open and scan successful
+                open_ports.append(result)
+    return open_ports # Return all open port info
 
-    return port_info
+# Function to display scan results in formatted table
+def display_ports(ports):
+    if not ports:
+        print("No open ports found.")
+        return
+    # Print table headers
+    print(f"\n{'Port':<8}{'State':<10}{'Protocol':<10}{'Service'}")
+    # Print each port's information in sorted order
+    for p in sorted(ports, key=lambda x: (x['port'], x['protocol'])):
+        print(f"{p['port']:<8}{p['state']:<10}{p['protocol']:<10}{p['service']}")
 
-# Display the results in a formatted table
-def scan_port_withServices(target_ip):
-    print(f"Starting scan on {target_ip}...\n")
-    print(f"{'PORT':<10} {'STATE':<10} SERVICE")
-
-    start_time = time.time()
-    port_info = scan_ports(target_ip)  # Get detailed port info
-    scan_duration = time.time() - start_time
-
-    # Display each port with state and service
-    for info in port_info:
-        print(f"{info['port']}/tcp".ljust(10), info['state'].ljust(10), info['service'])
-
-    print(f"\nScan completed in {scan_duration:.2f} seconds.")
-
+# If this script is run directly (not imported)
 if __name__ == "__main__":
-    target_ip = input("Enter IP address: ")
-    scan_port_withServices(target_ip)
+    ip = input("Enter IP to scan: ").strip() # Get target IP address from user
+    ports = scan_ports(ip, (1, 10000))  # Scan ports 1 to 10000; you can adjust range
+    display_ports(ports) # Show formatted results
