@@ -4,6 +4,7 @@ import findVendor
 import getPorts
 import getOS
 import getDeviceType
+import firewall
 import subprocess # Imports the built-in subprocess module, which allows running external system commands and getting their output within the Python script.
 from concurrent.futures import ThreadPoolExecutor # Imports ThreadPoolExecutor from concurrent.futures, which is used for multithreading. It allows running functions concurrently in separate threads — useful for faster network scanning.
 import netifaces # Imports the third-party module netifaces, used to retrieve network interface information such as IP addresses, gateways, etc.
@@ -125,6 +126,8 @@ if __name__ == '__main__': # Ensures this code runs only when the script is exec
             print("Ports: None open")
             dtype = 'Unknown' # If open ports are found, shows port info and guesses device type; otherwise marks as unknown.
         print(f"Device Type: {dtype}")
+        firewall_status = firewall.detect_firewall(ip)
+        print(f"Firewall Status: {firewall_status}")
         print("-------------------------")
 
     print("\nMade by Md. Ashav Noman Mahin.")
