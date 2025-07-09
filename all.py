@@ -73,12 +73,12 @@ def save_connected_ips(ip_list, filename='connected_ips.txt'): # Defines a funct
     with open(filename, 'w') as f: # Opens the file for writing. If the file already exists, it will overwrite it. with ensures the file is properly closed after writing.
         f.write("\n".join(ip_list)) # Joins all IPs from the list into a single string, with each IP on a new line, then writes it to the file.
 
-def format_ports(ports): # Defines a function called format_ports, which takes a list of port dictionaries as input.
-    header = f"{'Port':<10} {'State':<10} Service" # Creates a header row with column titles: Port, State, and Service, aligned to the left with spacing.
-    lines = [header] # Initializes a list lines with the header as its first item.
-    for p in ports: # Loops through each item (p) in the ports list. Each item is expected to be a dictionary with keys: 'port', 'state', and 'service'.
-        lines.append(f"{p['port']:<10} {p['state']:<10} {p['service']}") # Formats each port entry into a string and adds it to the lines list.
-    return "\n".join(lines) # Joins all lines into a single string with new lines in between, and returns it.
+def format_ports(ports):
+    header = f"{'Port':<10}{'State':<10}{'Protocol':<10}{'Service'}"
+    lines = [header]
+    for p in ports:
+        lines.append(f"{p['port']:<10}{p['state']:<10}{p['protocol']:<10}{p['service']}")
+    return "\n".join(lines)
 
 if __name__ == '__main__': # Ensures this code runs only when the script is executed directly (not imported as a module).
 
@@ -118,7 +118,7 @@ if __name__ == '__main__': # Ensures this code runs only when the script is exec
         print(f"Vendor Name: {vendor}") # Finds the device manufacturer based on MAC and prints it.
         os_info = getOS.detect_os(ip)
         print(f"OS Details: {os_info}") # Tries to detect the operating system of the device and prints it.
-        ports = getPorts.scan_ports(ip) # Scans for open ports on the device.
+        ports = getPorts.scan_ports(ip, (1, 10000))  # or whatever range
         if ports:
             print("Ports Information:\n" + format_ports(ports))
             dtype = getDeviceType.guess_type(vendor, ports) or 'Unknown'
